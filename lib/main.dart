@@ -1,122 +1,138 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'login_screen.dart';
+import 'dashboards/admin_dashboard.dart';
+import 'dashboards/manager_dashboard.dart';
+import 'dashboards/operator_dashboard.dart';
 
-void main() {
-  runApp(const MyApp());
+final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://mfpkzoqmhyprbhtelblb.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcGt6b3FtaHlwcmJodGVsYmxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjAwNzAsImV4cCI6MjEwNDY5NjA3MH0.K6oUqdoKISjR5Pzi7KiJ_go7cjq4QSu9gnVtz_rpGYg',
+  );
+  runApp(const ProviderScope(child: AOSApp()));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+final supabase = Supabase.instance.client;
 
-  // This widget is the root of your application.
+class AOSApp extends StatelessWidget {
+  const AOSApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'AOS',
+      scaffoldMessengerKey: scaffoldMessengerKey,
+      home: const AuthGate(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: supabase.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final session = supabase.auth.currentSession;
+        if (session == null) {
+          return const LoginScreen();
+        }
+        return const RoleRouter();
+      },
+    );
+  }
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class RoleRouter extends StatefulWidget {
+  const RoleRouter({super.key});
 
-  void _incrementCounter() {
+  @override
+  State<RoleRouter> createState() => _RoleRouterState();
+}
+
+class _RoleRouterState extends State<RoleRouter> {
+  Map<String, dynamic>? _staffRow;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final userId = supabase.auth.currentUser!.id;
+    final response = await supabase
+        .from('staff')
+        .select('role, branch_id')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (response != null && (response['role'] == 'operator' || response['role'] == 'manager')) {
+      await _markAttendance(userId, response['branch_id']);
+    }
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _staffRow = response;
+      _loading = false;
+    });
+  }
+
+  Future<void> _markAttendance(String staffId, String branchId) async {
+    String message;
+    try {
+      await supabase.from('attendance').insert({
+        'staff_id': staffId,
+        'branch_id': branchId,
+      });
+      message = 'Attendance marked for today';
+    } catch (e) {
+      message = 'Attendance already marked for today';
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final role = _staffRow?['role'] as String?;
+    switch (role) {
+      case 'admin':
+        return const AdminDashboard();
+      case 'manager':
+        return const ManagerDashboard();
+      case 'operator':
+        return const OperatorDashboard();
+      default:
+        return Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('No staff record found for this account.'),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => supabase.auth.signOut(),
+                  child: const Text('Sign out'),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
+          ),
+        );
+    }
   }
 }
