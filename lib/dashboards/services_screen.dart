@@ -4,7 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ServicesScreen extends StatefulWidget {
-  const ServicesScreen({super.key});
+  final bool readOnly;
+  const ServicesScreen({super.key, this.readOnly = false});
 
   @override
   State<ServicesScreen> createState() => _ServicesScreenState();
@@ -22,13 +23,134 @@ class _ServicesScreenState extends State<ServicesScreen> {
     _loadData();
   }
 
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  List<Map<String, dynamic>> _cache = [];
+  Object? _cacheSvc;
+  String? _cacheQ;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (!identical(_cacheSvc, _services) || _cacheQ != _query) {
+      _cacheSvc = _services;
+      _cacheQ = _query;
+      _cache = _fuzzyFilter(_services, _query);
+    }
+    return _cache;
+  }
+
+  static int _lev(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+    var prev = List<int>.generate(b.length + 1, (i) => i);
+    for (var i = 1; i <= a.length; i++) {
+      final cur = List<int>.filled(b.length + 1, 0);
+      cur[0] = i;
+      for (var j = 1; j <= b.length; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        var m = prev[j] + 1;
+        if (cur[j - 1] + 1 < m) m = cur[j - 1] + 1;
+        if (prev[j - 1] + cost < m) m = prev[j - 1] + cost;
+        cur[j] = m;
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  static int _tokenScore(String token, String hay, List<String> words) {
+    if (hay.contains(token)) {
+      return words.any((w) => w.startsWith(token)) ? 100 : 80;
+    }
+    if (token.length < 4) return 0;
+    final maxEdits = token.length <= 5 ? 1 : 2;
+    var best = 0;
+    for (final w in words) {
+      if (w.length < 3) continue;
+      final d1 = _lev(token, w);
+      final prefix = w.length > token.length ? w.substring(0, token.length) : w;
+      final d2 = _lev(token, prefix);
+      final d = d1 < d2 ? d1 : d2;
+      if (d <= maxEdits) {
+        final sc = 60 - d * 10;
+        if (sc > best) best = sc;
+      }
+    }
+    return best;
+  }
+
+  static List<Map<String, dynamic>> _fuzzyFilter(
+      List<Map<String, dynamic>> list, String query) {
+    final tokens = query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    if (tokens.isEmpty) return list;
+    final scored = <MapEntry<Map<String, dynamic>, int>>[];
+    for (final s in list) {
+      final docs = (s['required_documents'] as List?)?.join(' ') ?? '';
+      final name = '${s['name'] ?? ''}'.toLowerCase();
+      final hay = '$name ${s['service_categories']?['name'] ?? ''} $docs'.toLowerCase();
+      final words = hay.split(RegExp(r'[^a-z0-9]+')).where((w) => w.isNotEmpty).toList();
+      var total = 0;
+      var ok = true;
+      for (final t in tokens) {
+        final sc = _tokenScore(t, hay, words);
+        if (sc == 0) {
+          ok = false;
+          break;
+        }
+        total += sc;
+      }
+      if (!ok) continue;
+      if (name.contains(tokens.join(' '))) total += 50;
+      scored.add(MapEntry(s, total));
+    }
+    scored.sort((a, b) => b.value.compareTo(a.value));
+    return scored.map((e) => e.key).toList();
+  }
+
+  Widget _searchBar() => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+        child: TextField(
+          controller: _searchCtrl,
+          decoration: InputDecoration(
+            hintText: 'Search services, category or documents',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+            helperText: _query.trim().isEmpty
+                ? null
+                : '${_filtered.length} of ${_services.length} services',
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          onChanged: (v) => setState(() => _query = v),
+        ),
+      );
+
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
-      final services = await supabase
-          .from('services')
-          .select('*, service_categories(name)')
-          .order('created_at', ascending: false);
+      var q = supabase.from('services').select('*, service_categories(name)');
+      if (widget.readOnly) q = q.eq('is_active', true);
+      final services = await (widget.readOnly
+          ? q.order('name')
+          : q.order('created_at', ascending: false));
       final categories = await supabase.from('service_categories').select().order('name');
       setState(() {
         _services = List<Map<String, dynamic>>.from(services);
@@ -272,8 +394,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Services Catalog'),
-        actions: [
+        title: Text(widget.readOnly ? 'Services & Rates' : 'Services Catalog'),
+        actions: widget.readOnly ? [] : [
           IconButton(
             icon: const Icon(Icons.category),
             tooltip: 'Add Category',
@@ -281,14 +403,18 @@ class _ServicesScreenState extends State<ServicesScreen> {
           ),
         ],
       ),
-      body: _loading
+      body: Column(children: [
+        _searchBar(),
+        Expanded(child: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _services.isEmpty
-              ? const Center(child: Text('No services yet. Tap + to add one.'))
+          : _filtered.isEmpty
+              ? Center(child: Text(_services.isEmpty
+                  ? (widget.readOnly ? 'No services available.' : 'No services yet. Tap + to add one.')
+                  : 'No services match your search.'))
               : ListView.builder(
-                  itemCount: _services.length,
+                  itemCount: _filtered.length,
                   itemBuilder: (context, index) {
-                    final s = _services[index];
+                    final s = _filtered[index];
                     final categoryName = s['service_categories']?['name'] ?? 'Uncategorized';
                     final isActive = s['is_active'] ?? true;
                     final docs = (s['required_documents'] as List?)?.cast<String>() ?? [];
@@ -307,7 +433,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                     style: TextStyle(fontWeight: FontWeight.bold, color: isActive ? null : Colors.grey),
                                   ),
                                 ),
-                                IconButton(
+                                if (!widget.readOnly) ...[
+IconButton(
                                   icon: const Icon(Icons.edit),
                                   onPressed: () => _showServiceDialog(existing: s),
                                 ),
@@ -315,10 +442,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                   icon: const Icon(Icons.delete, color: Colors.red),
                                   onPressed: () => _deleteService(s['id']),
                                 ),
+],
                               ],
                             ),
                             Text(
-                              '$categoryName • Base ₹${s['base_rate']} • Govt ₹${s['govt_fee']} • Incentive ₹${s['operator_incentive']}'
+                              '$categoryName • Base ₹${s['base_rate']} • Govt ₹${s['govt_fee']}${widget.readOnly ? '' : ' • Incentive ₹${s['operator_incentive']}'}'
                               '${isActive ? '' : ' • INACTIVE'}',
                             ),
                             if (docs.isNotEmpty)
@@ -347,8 +475,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ),
                     );
                   },
-                ),
-      floatingActionButton: FloatingActionButton(
+                )),
+      ]),
+      floatingActionButton: widget.readOnly ? null : FloatingActionButton(
         onPressed: _categories.isEmpty
             ? _showAddCategoryDialog
             : () => _showServiceDialog(),

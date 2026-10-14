@@ -52,7 +52,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          SizedBox(width: 70, child: Text('$label:')),
+          SizedBox(width: 90, child: Text('$label:')),
           Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
           IconButton(
             icon: const Icon(Icons.copy, size: 18),
@@ -86,6 +86,31 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     if (days >= 2) return Colors.red;
     if (days >= 1) return Colors.orange;
     return Colors.green;
+  }
+
+  String? _formattedAddress(Map<String, dynamic> c) {
+    final parts = <String>[];
+    if (c['care_of'] != null && c['care_of'] != '') parts.add('C/O ${c['care_of']}');
+    if (c['house_no'] != null && c['house_no'] != '') parts.add(c['house_no']);
+    if (c['street'] != null && c['street'] != '') parts.add(c['street']);
+    if (c['landmark'] != null && c['landmark'] != '') parts.add('Near ${c['landmark']}');
+    if (c['locality'] != null && c['locality'] != '') parts.add(c['locality']);
+    if (c['village_town_city'] != null && c['village_town_city'] != '') parts.add(c['village_town_city']);
+    if (c['post_office'] != null && c['post_office'] != '') parts.add('PO: ${c['post_office']}');
+    if (c['district'] != null && c['district'] != '') parts.add(c['district']);
+    if (c['state'] != null && c['state'] != '') parts.add(c['state']);
+    if (c['pincode'] != null && c['pincode'] != '') parts.add(c['pincode']);
+    if (parts.isEmpty) return c['address'] as String?;
+    return parts.join(', ');
+  }
+
+  Future<List<Map<String, dynamic>>> _loadIdentityDocs(String customerId) async {
+    final data = await supabase
+        .from('customer_identity_documents')
+        .select()
+        .eq('customer_id', customerId)
+        .order('created_at');
+    return List<Map<String, dynamic>>.from(data);
   }
 
   Future<void> _openPortalLink(String url) async {
@@ -133,6 +158,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                       await supabase.from('service_requests').update({
                         'payment_status': 'received',
                         'payment_method': method,
+                        'payment_received_at': DateTime.now().toIso8601String(),
                       }).eq('id', requestId);
                       if (context.mounted) Navigator.pop(context);
                       _loadData();
@@ -308,11 +334,31 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     final nameController = TextEditingController(text: c['name'] ?? '');
     final mobileController = TextEditingController(text: c['mobile_number'] ?? '');
     final dobController = TextEditingController(text: c['dob'] ?? '');
-    final addressController = TextEditingController(text: c['address'] ?? '');
     final aadhaarController = TextEditingController(text: c['aadhaar_number'] ?? '');
     final panController = TextEditingController(text: c['pan_number'] ?? '');
     final voterController = TextEditingController(text: c['voter_id'] ?? '');
+    final emailController = TextEditingController(text: c['email'] ?? '');
+    final careOfController = TextEditingController(text: c['care_of'] ?? '');
+    final houseNoController = TextEditingController(text: c['house_no'] ?? '');
+    final streetController = TextEditingController(text: c['street'] ?? '');
+    final landmarkController = TextEditingController(text: c['landmark'] ?? '');
+    final localityController = TextEditingController(text: c['locality'] ?? '');
+    final vtcController = TextEditingController(text: c['village_town_city'] ?? '');
+    final postOfficeController = TextEditingController(text: c['post_office'] ?? '');
+    final districtController = TextEditingController(text: c['district'] ?? '');
+    final stateController = TextEditingController(text: c['state'] ?? '');
+    final pincodeController = TextEditingController(text: c['pincode'] ?? '');
     String? error;
+
+    final existingDocs = await _loadIdentityDocs(c['id']);
+    final List<Map<String, TextEditingController>> extraDocs = existingDocs
+        .map((d) => {
+              'name': TextEditingController(text: d['document_name'] ?? ''),
+              'number': TextEditingController(text: d['document_number'] ?? ''),
+            })
+        .toList();
+
+    if (!mounted) return;
 
     await showDialog(
       context: context,
@@ -326,10 +372,55 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Full Name')),
                 TextField(controller: mobileController, decoration: const InputDecoration(labelText: 'Mobile Number'), keyboardType: TextInputType.phone),
                 TextField(controller: dobController, decoration: const InputDecoration(labelText: 'DOB (YYYY-MM-DD)')),
-                TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address')),
                 TextField(controller: aadhaarController, decoration: const InputDecoration(labelText: 'Aadhaar Number')),
                 TextField(controller: panController, decoration: const InputDecoration(labelText: 'PAN Number')),
                 TextField(controller: voterController, decoration: const InputDecoration(labelText: 'Voter ID')),
+                TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email (optional)'), keyboardType: TextInputType.emailAddress),
+                const Divider(height: 24),
+                const Align(alignment: Alignment.centerLeft, child: Text('Address (DigiLocker Format)', style: TextStyle(fontWeight: FontWeight.bold))),
+                const SizedBox(height: 8),
+                TextField(controller: careOfController, decoration: const InputDecoration(labelText: 'Care Of (C/O) — optional')),
+                TextField(controller: houseNoController, decoration: const InputDecoration(labelText: 'House No. / Building / Apartment')),
+                TextField(controller: streetController, decoration: const InputDecoration(labelText: 'Street / Road / Lane')),
+                TextField(controller: landmarkController, decoration: const InputDecoration(labelText: 'Landmark — optional')),
+                TextField(controller: localityController, decoration: const InputDecoration(labelText: 'Area / Locality / Sector')),
+                TextField(controller: vtcController, decoration: const InputDecoration(labelText: 'Village / Town / City')),
+                TextField(controller: postOfficeController, decoration: const InputDecoration(labelText: 'Post Office')),
+                TextField(controller: districtController, decoration: const InputDecoration(labelText: 'District')),
+                TextField(controller: stateController, decoration: const InputDecoration(labelText: 'State')),
+                TextField(controller: pincodeController, decoration: const InputDecoration(labelText: 'PIN Code')),
+                const Divider(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Additional ID Documents', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextButton.icon(
+                      onPressed: () => setDialogState(() {
+                        extraDocs.add({'name': TextEditingController(), 'number': TextEditingController()});
+                      }),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  ],
+                ),
+                ...extraDocs.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final doc = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(child: TextField(controller: doc['name'], decoration: const InputDecoration(labelText: 'Document Name'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: doc['number'], decoration: const InputDecoration(labelText: 'Document Number'))),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle, color: Colors.red, size: 20),
+                          onPressed: () => setDialogState(() => extraDocs.removeAt(i)),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -351,11 +442,35 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     'name': nameController.text.trim(),
                     'mobile_number': mobileController.text.trim(),
                     'dob': dobController.text.trim().isEmpty ? null : dobController.text.trim(),
-                    'address': addressController.text.trim(),
                     'aadhaar_number': aadhaarController.text.trim(),
                     'pan_number': panController.text.trim(),
                     'voter_id': voterController.text.trim(),
+                    'email': emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+                    'care_of': careOfController.text.trim(),
+                    'house_no': houseNoController.text.trim(),
+                    'street': streetController.text.trim(),
+                    'landmark': landmarkController.text.trim(),
+                    'locality': localityController.text.trim(),
+                    'village_town_city': vtcController.text.trim(),
+                    'post_office': postOfficeController.text.trim(),
+                    'district': districtController.text.trim(),
+                    'state': stateController.text.trim(),
+                    'pincode': pincodeController.text.trim(),
                   }).eq('id', c['id']);
+
+                  await supabase.from('customer_identity_documents').delete().eq('customer_id', c['id']);
+                  final docsToInsert = extraDocs
+                      .where((d) => d['name']!.text.trim().isNotEmpty && d['number']!.text.trim().isNotEmpty)
+                      .map((d) => {
+                            'customer_id': c['id'],
+                            'document_name': d['name']!.text.trim(),
+                            'document_number': d['number']!.text.trim(),
+                          })
+                      .toList();
+                  if (docsToInsert.isNotEmpty) {
+                    await supabase.from('customer_identity_documents').insert(docsToInsert);
+                  }
+
                   if (context.mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -376,8 +491,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   }
 
   Future<void> _showAddServiceDialog() async {
-    String? serviceId = _services.isNotEmpty ? _services.first['id'] : null;
-    final amountController = TextEditingController();
+    Map<String, dynamic>? selectedService;
+    final quantityController = TextEditingController(text: '1');
     String paymentStatus = 'pending';
     String? paymentMethod;
     String? error;
@@ -394,11 +509,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final selectedService = _services.firstWhere(
-            (s) => s['id'] == serviceId,
-            orElse: () => <String, dynamic>{},
-          );
-          final requiredDocs = (selectedService['required_documents'] as List?)?.cast<String>() ?? [];
+          final requiredDocs = (selectedService?['required_documents'] as List?)?.cast<String>() ?? [];
+          final rate = selectedService == null
+              ? 0.0
+              : (selectedService!['base_rate'] as num? ?? 0).toDouble() + (selectedService!['govt_fee'] as num? ?? 0).toDouble();
+          final quantity = int.tryParse(quantityController.text) ?? 1;
+          final total = rate * quantity;
 
           return AlertDialog(
             title: const Text('Add Service Request'),
@@ -407,11 +523,24 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  DropdownButtonFormField<String>(
-                    value: serviceId,
-                    decoration: const InputDecoration(labelText: 'Service'),
-                    items: _services.map((s) => DropdownMenuItem(value: s['id'] as String, child: Text(s['name']))).toList(),
-                    onChanged: (v) => setDialogState(() => serviceId = v),
+                  Autocomplete<Map<String, dynamic>>(
+                    displayStringForOption: (s) => s['name'] as String,
+                    optionsBuilder: (textEditingValue) {
+                      if (textEditingValue.text == '') return const Iterable<Map<String, dynamic>>.empty();
+                      final query = textEditingValue.text.toLowerCase();
+                      return _services.where((s) => (s['name'] as String).toLowerCase().contains(query));
+                    },
+                    onSelected: (s) => setDialogState(() => selectedService = s),
+                    fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
+                      if (selectedService != null && textController.text != selectedService!['name']) {
+                        textController.text = selectedService!['name'];
+                      }
+                      return TextField(
+                        controller: textController,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(labelText: 'Search Service', hintText: 'Type to search...'),
+                      );
+                    },
                   ),
                   if (requiredDocs.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -429,24 +558,32 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  if (selectedService['portal_link'] != null && selectedService['portal_link'] != '')
+                  if (selectedService?['portal_link'] != null && selectedService!['portal_link'] != '')
                     TextButton.icon(
-                      onPressed: () => _openPortalLink(selectedService['portal_link']),
+                      onPressed: () => _openPortalLink(selectedService!['portal_link']),
                       icon: const Icon(Icons.open_in_new, size: 16),
                       label: const Text('Open Application Portal'),
                     ),
-                  if (selectedService['guide_pdf_path'] != null)
+                  if (selectedService?['guide_pdf_path'] != null)
                     TextButton.icon(
-                      onPressed: () => _openGuidePdf(selectedService['guide_pdf_path']),
+                      onPressed: () => _openGuidePdf(selectedService!['guide_pdf_path']),
                       icon: const Icon(Icons.picture_as_pdf, size: 16),
-                      label: Text(selectedService['guide_pdf_name'] ?? 'View Application Guide'),
+                      label: Text(selectedService!['guide_pdf_name'] ?? 'View Application Guide'),
                     ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: amountController,
-                    decoration: const InputDecoration(labelText: 'Amount'),
-                    keyboardType: TextInputType.number,
-                  ),
+                  const SizedBox(height: 12),
+                  if (selectedService != null) ...[
+                    Text('Rate (per unit): ₹${rate.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: quantityController,
+                      decoration: const InputDecoration(labelText: 'Quantity'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Total: ₹${total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 12),
+                  ],
                   DropdownButtonFormField<String>(
                     value: paymentStatus,
                     decoration: const InputDecoration(labelText: 'Payment Status'),
@@ -478,20 +615,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton(
-                onPressed: submitting
+                onPressed: (submitting || selectedService == null)
                     ? null
                     : () async {
                         setDialogState(() => submitting = true);
                         try {
                           await supabase.from('service_requests').insert({
                             'customer_id': widget.customer['id'],
-                            'service_id': serviceId,
+                            'service_id': selectedService!['id'],
                             'branch_id': branchId,
                             'operator_id': supabase.auth.currentUser!.id,
                             'status': 'initiated',
                             'payment_status': paymentStatus,
                             'payment_method': paymentMethod,
-                            'amount': double.tryParse(amountController.text) ?? 0,
+                            'payment_received_at': paymentStatus == 'received' ? DateTime.now().toIso8601String() : null,
+                            'quantity': quantity,
+                            'amount': total,
                           });
                           if (context.mounted) Navigator.pop(context);
                           _loadData();
@@ -536,7 +675,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _copyableLine('Mobile', c['mobile_number'] ?? ''),
-                if (c['address'] != null && c['address'] != '') _copyableLine('Address', c['address']),
+                if (c['email'] != null && c['email'] != '') _copyableLine('Email', c['email']),
+                if (c['dob'] != null && c['dob'] != '') Text('Date of Birth: ${c['dob']}'),
+                if (_formattedAddress(c) != null) _copyableLine('Address', _formattedAddress(c)!),
                 if (_hasAnyDoc(c)) ...[
                   const SizedBox(height: 8),
                   const Text('Documents on File', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -545,6 +686,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   _buildDocRow('PAN', c['pan_number']),
                   _buildDocRow('Voter ID', c['voter_id']),
                 ],
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _loadIdentityDocs(c['id']),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        const Text('Additional ID Documents', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        ...snapshot.data!.map((d) => _buildDocRow(d['document_name'], d['document_number'])),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
                 CustomerDocumentsSection(customerId: c['id']),
               ],

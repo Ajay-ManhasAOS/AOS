@@ -12,6 +12,15 @@ import 'branch_messages_list_screen.dart';
 import 'leaves_screen.dart';
 import 'stock_screen.dart';
 import 'consumables_screen.dart';
+import 'cash_deposits_screen.dart';
+import 'firm_documents_screen.dart';
+import 'branch_status_screen.dart';
+
+Widget _lead(IconData icon, Color color) => CircleAvatar(
+      backgroundColor: color.withOpacity(0.12),
+      child: Icon(icon, color: color),
+    );
+
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -19,8 +28,11 @@ class AdminDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.indigo.shade50,
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.lock_reset),
@@ -41,7 +53,7 @@ class AdminDashboard extends StatelessWidget {
         children: [
           Card(
             child: ListTile(
-              leading: const Icon(Icons.store),
+              leading: _lead(Icons.store, Colors.indigo),
               title: const Text('Branches'),
               subtitle: const Text('Add, edit, or view all branches'),
               trailing: const Icon(Icons.chevron_right),
@@ -53,7 +65,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.people),
+              leading: _lead(Icons.people, Colors.blue),
               title: const Text('Staff'),
               subtitle: const Text('Add and manage managers & operators'),
               trailing: const Icon(Icons.chevron_right),
@@ -65,7 +77,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.receipt),
+              leading: _lead(Icons.receipt, Colors.deepOrange),
               title: const Text('Expenses'),
               subtitle: const Text('HQ expenses & partner approvals'),
               trailing: const Icon(Icons.chevron_right),
@@ -77,7 +89,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.miscellaneous_services),
+              leading: _lead(Icons.miscellaneous_services, Colors.purple),
               title: const Text('Services Catalog'),
               subtitle: const Text('Manage services, rates, fees & incentives'),
               trailing: const Icon(Icons.chevron_right),
@@ -89,7 +101,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.inventory),
+              leading: _lead(Icons.inventory, Colors.brown),
               title: const Text('Assets'),
               subtitle: const Text('Track equipment, warranty & guarantee periods'),
               trailing: const Icon(Icons.chevron_right),
@@ -101,7 +113,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.bar_chart),
+              leading: _lead(Icons.bar_chart, Colors.teal),
               title: const Text('Reports'),
               subtitle: const Text('Daily income, sales & expenses by branch'),
               trailing: const Icon(Icons.chevron_right),
@@ -113,7 +125,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.payments),
+              leading: _lead(Icons.payments, Colors.green),
               title: const Text('Payroll'),
               subtitle: const Text('Monthly salary + incentive calculation'),
               trailing: const Icon(Icons.chevron_right),
@@ -125,7 +137,7 @@ class AdminDashboard extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.chat),
+              leading: _lead(Icons.chat, Colors.cyan),
               title: const Text('Messages'),
               subtitle: const Text('Send/receive notes with branches'),
               trailing: const Icon(Icons.chevron_right),
@@ -137,7 +149,7 @@ class AdminDashboard extends StatelessWidget {
           ),
         Card(
           child: ListTile(
-            leading: const Icon(Icons.event_busy),
+            leading: _lead(Icons.event_busy, Colors.pink),
             title: const Text('Leaves'),
             subtitle: const Text('Review and approve staff leave requests'),
             trailing: const Icon(Icons.chevron_right),
@@ -149,7 +161,7 @@ class AdminDashboard extends StatelessWidget {
         ),
       Card(
   child: ListTile(
-    leading: const Icon(Icons.inventory_2),
+    leading: _lead(Icons.inventory_2, Colors.orange),
     title: const Text('Stock Report'),
     subtitle: const Text('View branch stock levels, send stock to branches'),
     trailing: const Icon(Icons.chevron_right),
@@ -161,13 +173,49 @@ class AdminDashboard extends StatelessWidget {
 ),
 Card(
   child: ListTile(
-    leading: const Icon(Icons.print),
+    leading: _lead(Icons.print, Colors.blueGrey),
     title: const Text('Consumables Log'),
     subtitle: const Text('Audit branch printing/paper usage'),
     trailing: const Icon(Icons.chevron_right),
     onTap: () => Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ConsumablesScreen()),
+    ),
+  ),
+),
+Card(
+  child: ListTile(
+    leading: _lead(Icons.account_balance_wallet, Colors.green.shade700),
+    title: const Text('Cash Deposits'),
+    subtitle: const Text('Confirm cash collected and deposited by branches'),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CashDepositsScreen()),
+    ),
+  ),
+),
+Card(
+  child: ListTile(
+    leading: _lead(Icons.folder_special, Colors.amber.shade800),
+    title: const Text('Firm Documents'),
+    subtitle: const Text('Registration certificates, licenses, agreements'),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FirmDocumentsScreen()),
+    ),
+  ),
+),
+Card(
+  child: ListTile(
+    leading: _lead(Icons.account_tree, Colors.deepPurple),
+    title: const Text('Branch-wise Status'),
+    subtitle: const Text('Pending, under process, overdue by branch'),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BranchStatusScreen()),
     ),
   ),
 ),

@@ -50,10 +50,23 @@ class _CustomerLookupScreenState extends State<CustomerLookupScreen> {
     final mobileFieldController = TextEditingController(text: prefillMobile ?? mobileController.text.trim());
     final nameController = TextEditingController();
     final dobController = TextEditingController();
-    final addressController = TextEditingController();
     final aadhaarController = TextEditingController();
     final panController = TextEditingController();
     final voterController = TextEditingController();
+    final emailController = TextEditingController();
+
+    final careOfController = TextEditingController();
+    final houseNoController = TextEditingController();
+    final streetController = TextEditingController();
+    final landmarkController = TextEditingController();
+    final localityController = TextEditingController();
+    final vtcController = TextEditingController();
+    final postOfficeController = TextEditingController();
+    final districtController = TextEditingController();
+    final stateController = TextEditingController();
+    final pincodeController = TextEditingController();
+
+    final List<Map<String, TextEditingController>> extraDocs = [];
     String? error;
 
     await showDialog(
@@ -72,10 +85,58 @@ class _CustomerLookupScreenState extends State<CustomerLookupScreen> {
                 ),
                 TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Full Name')),
                 TextField(controller: dobController, decoration: const InputDecoration(labelText: 'DOB (YYYY-MM-DD)')),
-                TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address')),
                 TextField(controller: aadhaarController, decoration: const InputDecoration(labelText: 'Aadhaar Number')),
                 TextField(controller: panController, decoration: const InputDecoration(labelText: 'PAN Number')),
                 TextField(controller: voterController, decoration: const InputDecoration(labelText: 'Voter ID')),
+                TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email (optional)'), keyboardType: TextInputType.emailAddress),
+
+                const Divider(height: 24),
+                const Align(alignment: Alignment.centerLeft, child: Text('Address (DigiLocker Format)', style: TextStyle(fontWeight: FontWeight.bold))),
+                const SizedBox(height: 8),
+                TextField(controller: careOfController, decoration: const InputDecoration(labelText: 'Care Of (C/O) — optional')),
+                TextField(controller: houseNoController, decoration: const InputDecoration(labelText: 'House No. / Building / Apartment')),
+                TextField(controller: streetController, decoration: const InputDecoration(labelText: 'Street / Road / Lane')),
+                TextField(controller: landmarkController, decoration: const InputDecoration(labelText: 'Landmark — optional')),
+                TextField(controller: localityController, decoration: const InputDecoration(labelText: 'Area / Locality / Sector')),
+                TextField(controller: vtcController, decoration: const InputDecoration(labelText: 'Village / Town / City')),
+                TextField(controller: postOfficeController, decoration: const InputDecoration(labelText: 'Post Office')),
+                TextField(controller: districtController, decoration: const InputDecoration(labelText: 'District')),
+                TextField(controller: stateController, decoration: const InputDecoration(labelText: 'State')),
+                TextField(controller: pincodeController, decoration: const InputDecoration(labelText: 'PIN Code'), keyboardType: TextInputType.number),
+
+                const Divider(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Additional ID Documents', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextButton.icon(
+                      onPressed: () => setDialogState(() {
+                        extraDocs.add({'name': TextEditingController(), 'number': TextEditingController()});
+                      }),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  ],
+                ),
+                ...extraDocs.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final doc = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(child: TextField(controller: doc['name'], decoration: const InputDecoration(labelText: 'Document Name'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: doc['number'], decoration: const InputDecoration(labelText: 'Document Number'))),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle, color: Colors.red, size: 20),
+                          onPressed: () => setDialogState(() => extraDocs.removeAt(i)),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -97,11 +158,34 @@ class _CustomerLookupScreenState extends State<CustomerLookupScreen> {
                     'mobile_number': mobileFieldController.text.trim(),
                     'name': nameController.text.trim(),
                     'dob': dobController.text.trim().isEmpty ? null : dobController.text.trim(),
-                    'address': addressController.text.trim(),
                     'aadhaar_number': aadhaarController.text.trim(),
                     'pan_number': panController.text.trim(),
                     'voter_id': voterController.text.trim(),
+                    'email': emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+                    'care_of': careOfController.text.trim(),
+                    'house_no': houseNoController.text.trim(),
+                    'street': streetController.text.trim(),
+                    'landmark': landmarkController.text.trim(),
+                    'locality': localityController.text.trim(),
+                    'village_town_city': vtcController.text.trim(),
+                    'post_office': postOfficeController.text.trim(),
+                    'district': districtController.text.trim(),
+                    'state': stateController.text.trim(),
+                    'pincode': pincodeController.text.trim(),
                   }).select().single();
+
+                  final docsToInsert = extraDocs
+                      .where((d) => d['name']!.text.trim().isNotEmpty && d['number']!.text.trim().isNotEmpty)
+                      .map((d) => {
+                            'customer_id': inserted['id'],
+                            'document_name': d['name']!.text.trim(),
+                            'document_number': d['number']!.text.trim(),
+                          })
+                      .toList();
+                  if (docsToInsert.isNotEmpty) {
+                    await supabase.from('customer_identity_documents').insert(docsToInsert);
+                  }
+
                   if (context.mounted) {
                     Navigator.pop(context);
                     Navigator.push(

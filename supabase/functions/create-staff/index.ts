@@ -4,7 +4,7 @@ const jsonHeaders = { 'Content-Type': 'application/json' };
 
 Deno.serve(async (req) => {
   try {
-    const { name, email, password, role, branch_id, salary } = await req.json();
+    const { name, email, password, role, branch_id, salary, phone, address, date_of_joining, emergency_contact_name, emergency_contact_phone } = await req.json();
     console.log('Received request:', { name, email, role, branch_id, salary });
 
     const authHeader = req.headers.get('Authorization')!;
@@ -59,6 +59,11 @@ Deno.serve(async (req) => {
       role,
       branch_id,
       salary,
+      phone,
+      address,
+      date_of_joining,
+      emergency_contact_name,
+      emergency_contact_phone,
       status: 'active',
     });
 
