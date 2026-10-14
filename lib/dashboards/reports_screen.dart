@@ -20,6 +20,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Map<String, Map<String, double>> _branchTotals = {};
   double _totalRevenue = 0;
   double _totalExpenses = 0;
+  double _totalGovt = 0;
+  double _totalIncentive = 0;
 
   @override
   void initState() {
@@ -86,10 +88,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       final requests = await supabase
           .from('service_requests')
-          .select('amount, branch_id, branches!service_requests_branch_id_fkey(name)')
+          .select('amount, quantity, branch_id, services(govt_fee, operator_incentive), branches!service_requests_branch_id_fkey(name)')
           .eq('payment_status', 'received')
-          .gte('created_at', startStr)
-          .lt('created_at', endStr);
+          .gte('payment_received_at', startStr)
+          .lt('payment_received_at', endStr);
 
       final expenses = await supabase
           .from('expenses')
@@ -102,12 +104,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
       double revTotal = 0;
       double expTotal = 0;
 
+      double govtTotal = 0;
+      double incTotal = 0;
       for (final r in requests) {
         final name = r['branches']?['name'] ?? 'Unknown';
+        final qty = (r['quantity'] as num?)?.toInt() ?? 1;
         final amt = (r['amount'] as num?)?.toDouble() ?? 0;
-        totals.putIfAbsent(name, () => {'revenue': 0, 'expenses': 0});
+        final govt = ((r['services']?['govt_fee'] as num?)?.toDouble() ?? 0) * qty;
+        final inc = ((r['services']?['operator_incentive'] as num?)?.toDouble() ?? 0) * qty;
+        totals.putIfAbsent(name, () => {'revenue': 0, 'expenses': 0, 'govt': 0, 'incentive': 0});
         totals[name]!['revenue'] = totals[name]!['revenue']! + amt;
+        totals[name]!['govt'] = totals[name]!['govt']! + govt;
+        totals[name]!['incentive'] = totals[name]!['incentive']! + inc;
         revTotal += amt;
+        govtTotal += govt;
+        incTotal += inc;
       }
       for (final e in expenses) {
         final name = e['branches']?['name'] ?? 'Unknown';
@@ -121,6 +132,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _branchTotals = totals;
         _totalRevenue = revTotal;
         _totalExpenses = expTotal;
+        _totalGovt = govtTotal;
+        _totalIncentive = incTotal;
         _loading = false;
       });
     } catch (e) {
@@ -185,11 +198,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             children: [
                               const Text('Company-wide', style: TextStyle(fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
-                              Text('Revenue: ₹${_totalRevenue.toStringAsFixed(2)}'),
-                              Text('Expenses: ₹${_totalExpenses.toStringAsFixed(2)}'),
+                              Text('Amount collected: ₹${_totalRevenue.toStringAsFixed(2)}'),
+                              Text('Govt fees (pass-through): - ₹${_totalGovt.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
+                              const Divider(),
+                              Text('Service revenue: ₹${(_totalRevenue - _totalGovt).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text('Operator incentive: - ₹${_totalIncentive.toStringAsFixed(2)}'),
+                              Text('Expenses: - ₹${_totalExpenses.toStringAsFixed(2)}'),
+                              const Divider(),
                               Text(
-                                'Net: ₹${(_totalRevenue - _totalExpenses).toStringAsFixed(2)}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                'Net margin: ₹${(_totalRevenue - _totalGovt - _totalIncentive - _totalExpenses).toStringAsFixed(2)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                               ),
                             ],
                           ),
@@ -202,11 +220,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ..._branchTotals.entries.map((entry) {
                         final rev = entry.value['revenue'] ?? 0;
                         final exp = entry.value['expenses'] ?? 0;
+                        final govt = entry.value['govt'] ?? 0;
+                        final inc = entry.value['incentive'] ?? 0;
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             title: Text(entry.key),
-                            subtitle: Text('Revenue: ₹${rev.toStringAsFixed(2)} • Expenses: ₹${exp.toStringAsFixed(2)} • Net: ₹${(rev - exp).toStringAsFixed(2)}'),
+                            subtitle: Text('Collected: ₹${rev.toStringAsFixed(2)} • Govt fee: ₹${govt.toStringAsFixed(2)} • Service revenue: ₹${(rev - govt).toStringAsFixed(2)}\nIncentive: ₹${inc.toStringAsFixed(2)} • Expenses: ₹${exp.toStringAsFixed(2)} • Net margin: ₹${(rev - govt - inc - exp).toStringAsFixed(2)}'),
+                            isThreeLine: true,
                           ),
                         );
                       }),
