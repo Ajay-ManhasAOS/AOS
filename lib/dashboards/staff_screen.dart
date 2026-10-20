@@ -230,6 +230,9 @@ pw.Text('Branch: $branchName'),
 
   Future<void> _showStatusDialog(Map<String, dynamic> staff) async {
     String status = staff['status'] ?? 'active';
+    DateTime? leavingDate = staff['date_of_leaving'] != null
+        ? DateTime.parse(staff['date_of_leaving'])
+        : null;
     String? error;
 
     await showDialog(
@@ -260,6 +263,25 @@ pw.Text('Branch: $branchName'),
                   ],
                   onChanged: (v) => setDialogState(() => status = v!),
                 ),
+                if (status == 'resigned')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.event),
+                      label: Text(leavingDate == null
+                          ? 'Select last working day'
+                          : 'Last working day: ${DateFormat('dd MMM yyyy').format(leavingDate!)}'),
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: leavingDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) setDialogState(() => leavingDate = picked);
+                      },
+                    ),
+                  ),
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -273,7 +295,16 @@ pw.Text('Branch: $branchName'),
             ElevatedButton(
               onPressed: () async {
                 try {
-                  await supabase.from('staff').update({'status': status}).eq('id', staff['id']);
+                  if (status == 'resigned' && leavingDate == null) {
+                    setDialogState(() => error = 'Please select the last working day.');
+                    return;
+                  }
+                  await supabase.from('staff').update({
+                    'status': status,
+                    'date_of_leaving': status == 'resigned'
+                        ? DateFormat('yyyy-MM-dd').format(leavingDate!)
+                        : null,
+                  }).eq('id', staff['id']);
                   if (context.mounted) Navigator.pop(context);
                   _loadData();
                 } catch (e) {

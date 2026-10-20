@@ -60,6 +60,7 @@ class RoleRouter extends StatefulWidget {
 class _RoleRouterState extends State<RoleRouter> {
   Map<String, dynamic>? _staffRow;
   bool _loading = true;
+  bool _blocked = false;
 
   @override
   void initState() {
@@ -71,16 +72,22 @@ class _RoleRouterState extends State<RoleRouter> {
     final userId = supabase.auth.currentUser!.id;
     final response = await supabase
         .from('staff')
-        .select('role, branch_id')
+        .select('role, branch_id, status')
         .eq('id', userId)
         .maybeSingle();
 
-    if (response != null && (response['role'] == 'operator' || response['role'] == 'manager')) {
+    final status = response?['status'] as String?;
+    final blocked = response != null &&
+        response['role'] != 'admin' &&
+        (status == 'resigned' || status == 'suspended');
+
+    if (!blocked && response != null && (response['role'] == 'operator' || response['role'] == 'manager')) {
       await _markAttendance(userId, response['branch_id']);
     }
 
     setState(() {
       _staffRow = response;
+      _blocked = blocked;
       _loading = false;
     });
   }
@@ -108,6 +115,26 @@ class _RoleRouterState extends State<RoleRouter> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_blocked) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.block, size: 48, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text('Your account is not active.'),
+              const Text('Please contact the administrator.'),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => supabase.auth.signOut(),
+                child: const Text('Sign out'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     final role = _staffRow?['role'] as String?;
     switch (role) {

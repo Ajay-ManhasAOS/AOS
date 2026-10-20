@@ -30,9 +30,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
       final staffList = await supabase
           .from('staff')
-          .select('id, name, role, salary, branches(name)')
-          .neq('role', 'admin')
-          .eq('status', 'active');
+          .select('id, name, role, salary, status, date_of_joining, date_of_leaving, branches(name)')
+          .neq('role', 'admin');
 
       final completedRequests = await supabase
           .from('service_requests')
@@ -55,22 +54,57 @@ class _PayrollScreenState extends State<PayrollScreen> {
         incentiveByStaff[opId] = (incentiveByStaff[opId] ?? 0) + incentive;
       }
 
-      final rows = staffList.map((s) {
-        final salary = (s['salary'] as num?)?.toDouble() ?? 0;
-        final incentive = incentiveByStaff[s['id']] ?? 0;
+      final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+      final rows = <Map<String, dynamic>>[];
+      for (final s in staffList) {
+        final fullSalary = (s['salary'] as num?)?.toDouble() ?? 0;
         final paidRun = paidStaffIds[s['id']];
-        return {
+        if (s['status'] != 'active' && s['date_of_leaving'] == null && paidRun == null) continue;
+        int startDay = 1;
+        int endDay = daysInMonth;
+        final dojStr = s['date_of_joining'] as String?;
+        if (dojStr != null) {
+          final doj = DateTime.parse(dojStr);
+          if (!doj.isBefore(monthEnd)) {
+            if (paidRun == null) continue; // not joined yet in this month
+          } else if (doj.isAfter(monthStart)) {
+            startDay = doj.day;
+          }
+        }
+        final dolStr = s['date_of_leaving'] as String?;
+        if (dolStr != null) {
+          final dol = DateTime.parse(dolStr);
+          if (dol.isBefore(monthStart)) {
+            if (paidRun == null) continue; // left before this month
+          } else if (dol.year == monthStart.year && dol.month == monthStart.month) {
+            endDay = dol.day;
+          }
+        }
+        int daysWorked = (endDay - startDay + 1).clamp(0, daysInMonth).toInt();
+        if (paidRun != null && paidRun['days_worked'] != null) {
+          daysWorked = (paidRun['days_worked'] as num).toInt();
+        }
+        final prorated = (fullSalary * daysWorked / daysInMonth).roundToDouble();
+        final salary = paidRun != null
+            ? ((paidRun['base_salary'] as num?)?.toDouble() ?? prorated)
+            : prorated;
+        final incentive = paidRun != null
+            ? ((paidRun['incentive_total'] as num?)?.toDouble() ?? 0)
+            : (incentiveByStaff[s['id']] ?? 0);
+        rows.add({
           'staff_id': s['id'],
           'name': s['name'],
           'role': s['role'],
           'branch': s['branches']?['name'] ?? '',
           'salary': salary,
+          'days_worked': daysWorked,
+          'days_in_month': daysInMonth,
           'incentive': incentive,
           'total': salary + incentive,
           'paid': paidRun != null,
           'paid_total': paidRun?['total_paid'],
-        };
-      }).toList();
+        });
+      }
 
       setState(() {
         _rows = List<Map<String, dynamic>>.from(rows);
@@ -106,6 +140,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
         'staff_id': row['staff_id'],
         'month': monthStr,
         'base_salary': row['salary'],
+        'days_worked': row['days_worked'],
+        'days_in_month': row['days_in_month'],
         'incentive_total': row['incentive'],
         'total_paid': row['total'],
         'paid_by': supabase.auth.currentUser!.id,
@@ -170,7 +206,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                               if (paid) const Chip(label: Text('Paid'), backgroundColor: Color(0xFFDFF5E1)),
                             ],
                           ),
-                          Text('Salary: ₹${(r['salary'] as double).toStringAsFixed(2)}'),
+                          Text('Salary: ₹${(r['salary'] as double).toStringAsFixed(2)}${r['days_worked'] != r['days_in_month'] ? ' (${r['days_worked']} of ${r['days_in_month']} days)' : ''}'),
                           Text('Incentive: ₹${(r['incentive'] as double).toStringAsFixed(2)}'),
                           Text('Total: ₹${(r['total'] as double).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                           if (!paid)

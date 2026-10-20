@@ -40,6 +40,31 @@ Widget _stat(String label, int value, Color color) => Expanded(
       ),
     );
 
+Widget _tile(BuildContext context, IconData icon, Color color, String title,
+        String subtitle, Widget Function() screen) =>
+    ListTile(
+      leading: _lead(icon, color),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => screen()),
+      ),
+    );
+
+Widget _group(IconData icon, Color color, String title, List<Widget> tiles) => Card(
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: _lead(icon, color),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        children: tiles,
+      ),
+    );
+
 class OperatorDashboard extends StatelessWidget {
   const OperatorDashboard({super.key});
 
@@ -124,113 +149,46 @@ class OperatorDashboard extends StatelessWidget {
             }),
           ),
           Card(
-            child: ListTile(
-              leading: _lead(Icons.person_search, Colors.green.shade700),
-              title: const Text('Find / Add Customer'),
-              subtitle: const Text('Look up a customer by mobile or name, or add a new one'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CustomerLookupScreen()),
-              ),
-            ),
+            child: _tile(context, Icons.person_search, Colors.green.shade700,
+                'Find / Add Customer',
+                'Look up a customer by mobile or name, or add a new one',
+                () => const CustomerLookupScreen()),
           ),
           Card(
-            child: ListTile(
-              leading: _lead(Icons.list_alt, Colors.cyan.shade700),
-              title: const Text('Services & Rates'),
-              subtitle: const Text('Search services, fees and required documents'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ServicesScreen(readOnly: true)),
-              ),
-            ),
+            child: _tile(context, Icons.list_alt, Colors.cyan.shade700,
+                'Services & Rates',
+                'Search services, fees and required documents',
+                () => const ServicesScreen(readOnly: true)),
           ),
           Card(
-            child: ListTile(
-              leading: _lead(Icons.receipt, Colors.blue),
-              title: const Text('Expenses'),
-              subtitle: const Text('Log branch expenses for approval'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ExpensesScreen()),
-              ),
-            ),
+            child: _tile(context, Icons.hourglass_top, Colors.indigo,
+                'My Applications',
+                'Pending & under process, with days',
+                () => const MyApplicationsScreen()),
           ),
           Card(
-            child: ListTile(
-              leading: _lead(Icons.event_busy, Colors.deepOrange),
-              title: const Text('Leaves'),
-              subtitle: const Text('Request leave and track approval status'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LeavesScreen()),
-              ),
-            ),
+            child: _tile(context, Icons.point_of_sale, Colors.amber.shade800,
+                'My Sales',
+                'View sales, incentives, and deposit cash collected',
+                () => const SalesScreen()),
           ),
           Card(
-            child: ListTile(
-              leading: _lead(Icons.print, Colors.purple),
-              title: const Text('Consumables Log'),
-              subtitle: const Text('Log daily printing/paper usage'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ConsumablesScreen()),
-              ),
-            ),
+            child: _tile(context, Icons.move_to_inbox, Colors.pink,
+                'Delegated to Me',
+                'Tasks delegated from other branches',
+                () => const DelegatedTasksScreen()),
           ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.chat, Colors.teal),
-              title: const Text('Messages'),
-              subtitle: const Text('Send/receive notes with other branches'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BranchMessagesListScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.move_to_inbox, Colors.pink),
-              title: const Text('Delegated to Me'),
-              subtitle: const Text('Tasks delegated from other branches'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DelegatedTasksScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-            leading: _lead(Icons.point_of_sale, Colors.amber.shade800),
-            title: const Text('My Sales'),
-            subtitle: const Text('View sales, incentives, and deposit cash collected'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SalesScreen()),
-            ),
-          ),
-        ),
-        Card(
-            child: ListTile(
-            leading: _lead(Icons.hourglass_top, Colors.indigo),
-            title: const Text('My Applications'),
-            subtitle: const Text('Pending & under process, with days'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
-            ),
-        ),
-        ),
+          _group(Icons.business, Colors.green.shade700, 'Branch Admin', [
+            _tile(context, Icons.receipt, Colors.blue, 'Expenses',
+                'Log branch expenses for approval', () => const ExpensesScreen()),
+            _tile(context, Icons.print, Colors.purple, 'Consumables Log',
+                'Log daily printing/paper usage', () => const ConsumablesScreen()),
+            _tile(context, Icons.chat, Colors.teal, 'Messages',
+                'Send/receive notes with other branches',
+                () => const BranchMessagesListScreen()),
+            _tile(context, Icons.event_busy, Colors.deepOrange, 'Leaves',
+                'Request leave and track approval status', () => const LeavesScreen()),
+          ]),
         ],
       ),
     );

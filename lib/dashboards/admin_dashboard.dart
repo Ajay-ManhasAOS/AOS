@@ -15,12 +15,39 @@ import 'consumables_screen.dart';
 import 'cash_deposits_screen.dart';
 import 'firm_documents_screen.dart';
 import 'branch_status_screen.dart';
+import 'undeposited_cash_screen.dart';
+import 'pending_payroll_screen.dart';
 
 Widget _lead(IconData icon, Color color) => CircleAvatar(
       backgroundColor: color.withOpacity(0.12),
       child: Icon(icon, color: color),
     );
 
+
+Widget _tile(BuildContext context, IconData icon, Color color, String title,
+        String subtitle, Widget Function() screen) =>
+    ListTile(
+      leading: _lead(icon, color),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => screen()),
+      ),
+    );
+
+Widget _group(IconData icon, Color color, String title, List<Widget> tiles) => Card(
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: _lead(icon, color),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        children: tiles,
+      ),
+    );
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -51,174 +78,46 @@ class AdminDashboard extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.store, Colors.indigo),
-              title: const Text('Branches'),
-              subtitle: const Text('Add, edit, or view all branches'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BranchesScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.people, Colors.blue),
-              title: const Text('Staff'),
-              subtitle: const Text('Add and manage managers & operators'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const StaffScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.receipt, Colors.deepOrange),
-              title: const Text('Expenses'),
-              subtitle: const Text('HQ expenses & partner approvals'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ExpensesScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.miscellaneous_services, Colors.purple),
-              title: const Text('Services Catalog'),
-              subtitle: const Text('Manage services, rates, fees & incentives'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ServicesScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.inventory, Colors.brown),
-              title: const Text('Assets'),
-              subtitle: const Text('Track equipment, warranty & guarantee periods'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AssetsScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.bar_chart, Colors.teal),
-              title: const Text('Reports'),
-              subtitle: const Text('Daily income, sales & expenses by branch'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.payments, Colors.green),
-              title: const Text('Payroll'),
-              subtitle: const Text('Monthly salary + incentive calculation'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PayrollScreen()),
-              ),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: _lead(Icons.chat, Colors.cyan),
-              title: const Text('Messages'),
-              subtitle: const Text('Send/receive notes with branches'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BranchMessagesListScreen()),
-              ),
-            ),
-          ),
-        Card(
-          child: ListTile(
-            leading: _lead(Icons.event_busy, Colors.pink),
-            title: const Text('Leaves'),
-            subtitle: const Text('Review and approve staff leave requests'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LeavesScreen()),
-            ),
-          ),
-        ),
-      Card(
-  child: ListTile(
-    leading: _lead(Icons.inventory_2, Colors.orange),
-    title: const Text('Stock Report'),
-    subtitle: const Text('View branch stock levels, send stock to branches'),
-    trailing: const Icon(Icons.chevron_right),
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const StockScreen()),
-    ),
-  ),
-),
-Card(
-  child: ListTile(
-    leading: _lead(Icons.print, Colors.blueGrey),
-    title: const Text('Consumables Log'),
-    subtitle: const Text('Audit branch printing/paper usage'),
-    trailing: const Icon(Icons.chevron_right),
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ConsumablesScreen()),
-    ),
-  ),
-),
-Card(
-  child: ListTile(
-    leading: _lead(Icons.account_balance_wallet, Colors.green.shade700),
-    title: const Text('Cash Deposits'),
-    subtitle: const Text('Confirm cash collected and deposited by branches'),
-    trailing: const Icon(Icons.chevron_right),
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CashDepositsScreen()),
-    ),
-  ),
-),
-Card(
-  child: ListTile(
-    leading: _lead(Icons.folder_special, Colors.amber.shade800),
-    title: const Text('Firm Documents'),
-    subtitle: const Text('Registration certificates, licenses, agreements'),
-    trailing: const Icon(Icons.chevron_right),
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const FirmDocumentsScreen()),
-    ),
-  ),
-),
-Card(
-  child: ListTile(
-    leading: _lead(Icons.account_tree, Colors.deepPurple),
-    title: const Text('Branch-wise Status'),
-    subtitle: const Text('Pending, under process, overdue by branch'),
-    trailing: const Icon(Icons.chevron_right),
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const BranchStatusScreen()),
-    ),
-  ),
-),
+          _group(Icons.groups, Colors.blue, 'HR', [
+            _tile(context, Icons.people, Colors.blue, 'Staff',
+                'Add and manage managers & operators', () => const StaffScreen()),
+            _tile(context, Icons.payments, Colors.green, 'Payroll',
+                'Monthly salary + incentive calculation', () => const PayrollScreen()),
+            _tile(context, Icons.pending_actions, Colors.teal, 'Pending Payroll',
+                'Unpaid salary from earlier months', () => const PendingPayrollScreen()),
+            _tile(context, Icons.event_busy, Colors.pink, 'Leaves',
+                'Review and approve staff leave requests', () => const LeavesScreen()),
+          ]),
+          _group(Icons.account_balance, Colors.green.shade700, 'Finance', [
+            _tile(context, Icons.bar_chart, Colors.teal, 'Reports',
+                'Daily income, sales & expenses by branch', () => const ReportsScreen()),
+            _tile(context, Icons.receipt, Colors.deepOrange, 'Expenses',
+                'HQ expenses & partner approvals', () => const ExpensesScreen()),
+            _tile(context, Icons.account_balance_wallet, Colors.green.shade700, 'Cash Deposits',
+                'Confirm cash collected and deposited by branches', () => const CashDepositsScreen()),
+            _tile(context, Icons.account_balance_wallet, Colors.orange, 'Undeposited Cash',
+                'Cash lying with each branch', () => const UndepositedCashScreen()),
+          ]),
+          _group(Icons.dashboard_customize, Colors.deepPurple, 'Operations', [
+            _tile(context, Icons.account_tree, Colors.deepPurple, 'Branch-wise Status',
+                'Pending, under process, overdue by branch', () => const BranchStatusScreen()),
+            _tile(context, Icons.store, Colors.indigo, 'Branches',
+                'Add, edit, or view all branches', () => const BranchesScreen()),
+            _tile(context, Icons.miscellaneous_services, Colors.purple, 'Services Catalog',
+                'Manage services, rates, fees & incentives', () => const ServicesScreen()),
+            _tile(context, Icons.chat, Colors.cyan, 'Messages',
+                'Send/receive notes with branches', () => const BranchMessagesListScreen()),
+            _tile(context, Icons.folder_special, Colors.amber.shade800, 'Firm Documents',
+                'Registration certificates, licenses, agreements', () => const FirmDocumentsScreen()),
+          ]),
+          _group(Icons.inventory_2, Colors.brown, 'Inventory & Assets', [
+            _tile(context, Icons.inventory_2, Colors.orange, 'Stock Report',
+                'View branch stock levels, send stock to branches', () => const StockScreen()),
+            _tile(context, Icons.print, Colors.blueGrey, 'Consumables Log',
+                'Audit branch printing/paper usage', () => const ConsumablesScreen()),
+            _tile(context, Icons.inventory, Colors.brown, 'Assets',
+                'Track equipment, warranty & guarantee periods', () => const AssetsScreen()),
+          ]),
         ],
       ),
     );

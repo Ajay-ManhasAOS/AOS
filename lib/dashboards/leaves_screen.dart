@@ -72,7 +72,7 @@ class _LeavesScreenState extends State<LeavesScreen> {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: DateTime.now(),
-                      firstDate: DateTime.now(),
+                      firstDate: DateTime.now().subtract(const Duration(days: 30)),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
                     if (picked != null) setDialogState(() => startDate = picked);
@@ -187,6 +187,10 @@ class _LeavesScreenState extends State<LeavesScreen> {
                     final staffName = l['staff']?['name'] ?? 'Unknown';
                     final start = DateTime.parse(l['start_date']);
                     final end = DateTime.parse(l['end_date']);
+                    final createdRaw = l['created_at'] as String?;
+                    final created = createdRaw == null ? null : DateTime.parse(createdRaw).toLocal();
+                    final backDated = created != null &&
+                        start.isBefore(DateTime(created.year, created.month, created.day));
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: Padding(
@@ -206,6 +210,18 @@ class _LeavesScreenState extends State<LeavesScreen> {
                               ],
                             ),
                             Text('${df.format(start)} → ${df.format(end)}'),
+                            if (backDated)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.history, size: 16, color: Colors.orange.shade800),
+                                    const SizedBox(width: 4),
+                                    Text('Back-dated (applied ${df.format(created)})',
+                                        style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
                             if (l['reason'] != null && l['reason'] != '') Text('Reason: ${l['reason']}'),
                             if (canApprove && status == 'pending')
                               Padding(
