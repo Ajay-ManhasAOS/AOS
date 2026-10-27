@@ -17,6 +17,7 @@ import 'firm_documents_screen.dart';
 import 'branch_status_screen.dart';
 import 'undeposited_cash_screen.dart';
 import 'pending_payroll_screen.dart';
+import 'promo_codes_screen.dart';
 
 Widget _lead(IconData icon, Color color) => CircleAvatar(
       backgroundColor: color.withOpacity(0.12),
@@ -97,6 +98,8 @@ class AdminDashboard extends StatelessWidget {
                 'Confirm cash collected and deposited by branches', () => const CashDepositsScreen()),
             _tile(context, Icons.account_balance_wallet, Colors.orange, 'Undeposited Cash',
                 'Cash lying with each branch', () => const UndepositedCashScreen()),
+            _tile(context, Icons.local_offer, Colors.red, 'Promo Codes',
+                'Discount codes for selected services', () => const PromoCodesScreen()),
           ]),
           _group(Icons.dashboard_customize, Colors.deepPurple, 'Operations', [
             _tile(context, Icons.account_tree, Colors.deepPurple, 'Branch-wise Status',

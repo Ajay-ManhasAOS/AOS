@@ -207,6 +207,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
           : '',
     );
     final portalLinkController = TextEditingController(text: existing?['portal_link'] ?? '');
+    final noteController = TextEditingController(text: existing?['operator_note'] ?? '');
     String? guidePdfPath = existing?['guide_pdf_path'];
     String? guidePdfName = existing?['guide_pdf_name'];
     String? categoryId = existing?['category_id'] ?? (_categories.isNotEmpty ? _categories.first['id'] : null);
@@ -251,6 +252,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     hintText: 'e.g. Aadhaar Card, PAN Card, Passport Photo',
                   ),
                   maxLines: 2,
+                ),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note for operators (shown as a pop-up)',
+                    hintText: 'One check per line, e.g. Aadhaar photo must be updated',
+                  ),
+                  maxLines: 4,
                 ),
                 TextField(
                   controller: portalLinkController,
@@ -317,6 +326,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   'operator_incentive': double.tryParse(incentiveController.text) ?? 0,
                   'required_documents': docsList,
                   'portal_link': portalLinkController.text.trim(),
+                  'operator_note': noteController.text.trim().isEmpty ? null : noteController.text.trim(),
                   'guide_pdf_path': guidePdfPath,
                   'guide_pdf_name': guidePdfName,
                   'is_active': isActive,
@@ -456,6 +466,27 @@ IconButton(
                                   spacing: 6,
                                   runSpacing: 6,
                                   children: docs.map((d) => Chip(label: Text(d, style: const TextStyle(fontSize: 12)))).toList(),
+                                ),
+                              ),
+                            if ((s['operator_note'] as String?)?.trim().isNotEmpty == true)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    border: Border.all(color: Colors.orange.shade300),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 18),
+                                      const SizedBox(width: 6),
+                                      Expanded(child: Text((s['operator_note'] as String).trim(), style: const TextStyle(fontSize: 13))),
+                                    ],
+                                  ),
                                 ),
                               ),
                             if (s['portal_link'] != null && s['portal_link'] != '')

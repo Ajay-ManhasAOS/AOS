@@ -199,6 +199,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               Text('Mobile: ${widget.customer['mobile_number'] ?? ''}'),
               const SizedBox(height: 12),
               Text('Service: $serviceName'),
+              if (((request['discount_amount'] as num?) ?? 0) > 0)
+                Text('Discount applied: ₹${request['discount_amount']}'),
               Text('Amount: ₹$amount'),
               Text('Payment: ${request['payment_status']} via ${request['payment_method'] ?? '-'}'),
               const Divider(),
@@ -490,11 +492,52 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
   }
 
+  Future<void> _showServiceNote(BuildContext ctx, Map<String, dynamic> service) async {
+    final note = (service['operator_note'] as String?)?.trim() ?? '';
+    if (note.isEmpty) return;
+    final lines = note.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    await showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 36),
+        title: Text('Check before applying:\n${service['name']}',
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final l in lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [const Text('• '), Expanded(child: Text(l))],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(onPressed: () => Navigator.pop(c), child: const Text("I've checked this")),
+        ],
+      ),
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   Future<void> _showAddServiceDialog() async {
     Map<String, dynamic>? selectedService;
     final quantityController = TextEditingController(text: '1');
     String paymentStatus = 'pending';
     String? paymentMethod;
+    final promoController = TextEditingController();
+    String? promoId;
+    double discount = 0;
+    String? promoMessage;
+    bool applyingPromo = false;
     String? error;
     bool submitting = false;
 
@@ -515,6 +558,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               : (selectedService!['base_rate'] as num? ?? 0).toDouble() + (selectedService!['govt_fee'] as num? ?? 0).toDouble();
           final quantity = int.tryParse(quantityController.text) ?? 1;
           final total = rate * quantity;
+          final payable = (total - discount).clamp(0, double.infinity).toDouble();
 
           return AlertDialog(
             title: const Text('Add Service Request'),
@@ -530,7 +574,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                       final query = textEditingValue.text.toLowerCase();
                       return _services.where((s) => (s['name'] as String).toLowerCase().contains(query));
                     },
-                    onSelected: (s) => setDialogState(() => selectedService = s),
+                    onSelected: (s) => setDialogState(() {
+                      WidgetsBinding.instance.addPostFrameCallback((_) => _showServiceNote(context, s));
+                      selectedService = s;
+                      promoId = null;
+                      discount = 0;
+                      promoMessage = null;
+                    }),
                     fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
                       if (selectedService != null && textController.text != selectedService!['name']) {
                         textController.text = selectedService!['name'];
@@ -558,6 +608,24 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
+                  if ((selectedService?['operator_note'] as String?)?.trim().isNotEmpty == true)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        border: Border.all(color: Colors.orange.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text((selectedService!['operator_note'] as String).trim())),
+                        ],
+                      ),
+                    ),
                   if (selectedService?['portal_link'] != null && selectedService!['portal_link'] != '')
                     TextButton.icon(
                       onPressed: () => _openPortalLink(selectedService!['portal_link']),
@@ -578,10 +646,80 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                       controller: quantityController,
                       decoration: const InputDecoration(labelText: 'Quantity'),
                       keyboardType: TextInputType.number,
-                      onChanged: (_) => setDialogState(() {}),
+                      onChanged: (_) => setDialogState(() {
+                        promoId = null;
+                        discount = 0;
+                        promoMessage = null;
+                      }),
                     ),
                     const SizedBox(height: 8),
-                    Text('Total: ₹${total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('Amount before discount: ₹${total.toStringAsFixed(2)}'),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: promoController,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(labelText: 'Promo code (optional)'),
+                            onChanged: (_) => setDialogState(() {
+                              promoId = null;
+                              discount = 0;
+                              promoMessage = null;
+                            }),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: applyingPromo
+                              ? null
+                              : () async {
+                                  final code = promoController.text.trim();
+                                  if (code.isEmpty) return;
+                                  setDialogState(() => applyingPromo = true);
+                                  try {
+                                    final res = await supabase.rpc('validate_promo', params: {
+                                      'p_code': code,
+                                      'p_service_id': selectedService!['id'],
+                                      'p_customer_id': widget.customer['id'],
+                                      'p_quantity': quantity,
+                                    });
+                                    final m = Map<String, dynamic>.from(res as Map);
+                                    setDialogState(() {
+                                      applyingPromo = false;
+                                      promoMessage = m['message'] as String?;
+                                      if (m['valid'] == true) {
+                                        promoId = m['promo_id'] as String;
+                                        discount = (m['discount'] as num).toDouble();
+                                      } else {
+                                        promoId = null;
+                                        discount = 0;
+                                      }
+                                    });
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      applyingPromo = false;
+                                      promoId = null;
+                                      discount = 0;
+                                      promoMessage = 'Could not check the code. Try again.';
+                                    });
+                                  }
+                                },
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                    if (promoMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(promoMessage!,
+                            style: TextStyle(color: promoId != null ? Colors.green.shade700 : Colors.red)),
+                      ),
+                    const SizedBox(height: 8),
+                    if (discount > 0)
+                      Text('Discount: -₹${discount.toStringAsFixed(2)}',
+                          style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                    Text('Total to collect: ₹${payable.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
                   ],
                   DropdownButtonFormField<String>(
@@ -620,6 +758,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     : () async {
                         setDialogState(() => submitting = true);
                         try {
+                          if (promoController.text.trim().isNotEmpty && promoId == null) {
+                            setDialogState(() {
+                              error = 'Press Apply for the promo code, or clear the box.';
+                              submitting = false;
+                            });
+                            return;
+                          }
                           await supabase.from('service_requests').insert({
                             'customer_id': widget.customer['id'],
                             'service_id': selectedService!['id'],
@@ -630,7 +775,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             'payment_method': paymentMethod,
                             'payment_received_at': paymentStatus == 'received' ? DateTime.now().toIso8601String() : null,
                             'quantity': quantity,
-                            'amount': total,
+                            'amount': payable,
+                            'promo_code_id': promoId,
                           });
                           if (context.mounted) Navigator.pop(context);
                           _loadData();
