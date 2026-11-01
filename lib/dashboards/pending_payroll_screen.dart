@@ -56,7 +56,7 @@ class _PendingPayrollScreenState extends State<PendingPayrollScreen> {
       if (earliest != null) {
         final reqs = await supabase
             .from('service_requests')
-            .select('operator_id, quantity, completed_at, services(operator_incentive)')
+            .select('operator_id, quantity, completed_at, incentive_snapshot, services(operator_incentive)')
             .eq('status', 'completed')
             .gte('completed_at',
                 earliest.subtract(const Duration(days: 1)).toUtc().toIso8601String());
@@ -67,7 +67,7 @@ class _PendingPayrollScreenState extends State<PendingPayrollScreen> {
           final key = '${r['operator_id']}|${_ms(DateTime(d.year, d.month, 1))}';
           final q = (r['quantity'] as num?)?.toInt() ?? 1;
           final inc =
-              ((r['services']?['operator_incentive'] as num?)?.toDouble() ?? 0) * q;
+              (((r['incentive_snapshot'] ?? r['services']?['operator_incentive']) as num?)?.toDouble() ?? 0) * q;
           incentive[key] = (incentive[key] ?? 0) + inc;
         }
       }

@@ -18,6 +18,9 @@ import 'branch_status_screen.dart';
 import 'undeposited_cash_screen.dart';
 import 'pending_payroll_screen.dart';
 import 'promo_codes_screen.dart';
+import 'data_export_screen.dart';
+import 'capital_screen.dart';
+import 'profit_sharing_screen.dart';
 
 Widget _lead(IconData icon, Color color) => CircleAvatar(
       backgroundColor: color.withOpacity(0.12),
@@ -100,6 +103,12 @@ class AdminDashboard extends StatelessWidget {
                 'Cash lying with each branch', () => const UndepositedCashScreen()),
             _tile(context, Icons.local_offer, Colors.red, 'Promo Codes',
                 'Discount codes for selected services', () => const PromoCodesScreen()),
+            _tile(context, Icons.table_view, Colors.indigo, 'Data Export',
+                'View and download payment reports for a date range', () => const DataExportScreen()),
+            _tile(context, Icons.savings, Colors.green, 'Partner Capital',
+                'Capital received, used and remaining', () => const CapitalScreen()),
+            _tile(context, Icons.pie_chart, Colors.deepPurple, 'Profit Sharing',
+                'Month-end profit split, capital recovery and payments', () => const ProfitSharingScreen()),
           ]),
           _group(Icons.dashboard_customize, Colors.deepPurple, 'Operations', [
             _tile(context, Icons.account_tree, Colors.deepPurple, 'Branch-wise Status',

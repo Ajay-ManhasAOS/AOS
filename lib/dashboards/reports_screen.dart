@@ -88,7 +88,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       final requests = await supabase
           .from('service_requests')
-          .select('amount, quantity, branch_id, services(govt_fee, operator_incentive), branches!service_requests_branch_id_fkey(name)')
+          .select('amount, quantity, branch_id, govt_fee_snapshot, incentive_snapshot, services(govt_fee, operator_incentive), branches!service_requests_branch_id_fkey(name)')
           .eq('payment_status', 'received')
           .gte('payment_received_at', startStr)
           .lt('payment_received_at', endStr);
@@ -110,8 +110,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         final name = r['branches']?['name'] ?? 'Unknown';
         final qty = (r['quantity'] as num?)?.toInt() ?? 1;
         final amt = (r['amount'] as num?)?.toDouble() ?? 0;
-        final govt = ((r['services']?['govt_fee'] as num?)?.toDouble() ?? 0) * qty;
-        final inc = ((r['services']?['operator_incentive'] as num?)?.toDouble() ?? 0) * qty;
+        final govt = (((r['govt_fee_snapshot'] ?? r['services']?['govt_fee']) as num?)?.toDouble() ?? 0) * qty;
+        final inc = (((r['incentive_snapshot'] ?? r['services']?['operator_incentive']) as num?)?.toDouble() ?? 0) * qty;
         totals.putIfAbsent(name, () => {'revenue': 0, 'expenses': 0, 'govt': 0, 'incentive': 0});
         totals[name]!['revenue'] = totals[name]!['revenue']! + amt;
         totals[name]!['govt'] = totals[name]!['govt']! + govt;

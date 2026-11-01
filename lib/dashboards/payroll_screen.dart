@@ -35,7 +35,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
       final completedRequests = await supabase
           .from('service_requests')
-          .select('operator_id, quantity, services(operator_incentive)')
+          .select('operator_id, quantity, incentive_snapshot, services(operator_incentive)')
           .eq('status', 'completed')
           .gte('completed_at', monthStart.toIso8601String())
           .lt('completed_at', monthEnd.toIso8601String());
@@ -50,7 +50,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
       for (final r in completedRequests) {
         final opId = r['operator_id'] as String;
         final quantity = (r['quantity'] as num?)?.toInt() ?? 1;
-        final incentive = ((r['services']?['operator_incentive'] as num?)?.toDouble() ?? 0) * quantity;
+        final incentive = (((r['incentive_snapshot'] ?? r['services']?['operator_incentive']) as num?)?.toDouble() ?? 0) * quantity;
         incentiveByStaff[opId] = (incentiveByStaff[opId] ?? 0) + incentive;
       }
 

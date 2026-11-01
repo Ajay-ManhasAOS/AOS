@@ -11,6 +11,7 @@ import '../change_password_screen.dart';
 import 'sales_screen.dart';
 import 'my_applications_screen.dart';
 import 'services_screen.dart';
+import 'data_export_screen.dart';
 
 Widget _lead(IconData icon, Color color) => CircleAvatar(
       backgroundColor: color.withOpacity(0.12),
@@ -188,6 +189,8 @@ class OperatorDashboard extends StatelessWidget {
                 () => const BranchMessagesListScreen()),
             _tile(context, Icons.event_busy, Colors.deepOrange, 'Leaves',
                 'Request leave and track approval status', () => const LeavesScreen()),
+            _tile(context, Icons.table_view, Colors.indigo, 'My Reports',
+                'View and download your payments and expenses', () => const DataExportScreen()),
           ]),
         ],
       ),

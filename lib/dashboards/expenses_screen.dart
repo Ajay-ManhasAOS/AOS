@@ -53,6 +53,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final voucherController = TextEditingController();
     String? error;
     bool submitting = false;
+    bool fromCapital = false;
 
     await showDialog(
       context: context,
@@ -67,6 +68,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 TextField(controller: amountController, decoration: const InputDecoration(labelText: 'Amount'), keyboardType: TextInputType.number),
                 TextField(controller: voucherController, decoration: const InputDecoration(labelText: 'Voucher Reference')),
                 TextField(controller: noteController, decoration: const InputDecoration(labelText: 'Note (optional)')),
+                if (_myRole == 'admin')
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: const Text('Funded from capital (not from profit)'),
+                    value: fromCapital,
+                    onChanged: (v) => setDialogState(() => fromCapital = v ?? false),
+                  ),
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -90,6 +99,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           'amount': double.tryParse(amountController.text) ?? 0,
                           'voucher_reference': voucherController.text.trim(),
                           'note': noteController.text.trim(),
+                          'funded_from_capital': _myRole == 'admin' ? fromCapital : false,
                         });
                         if (context.mounted) Navigator.pop(context);
                         _loadData();
@@ -117,6 +127,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         'approved_by': supabase.auth.currentUser!.id,
         'reviewed_at': DateTime.now().toIso8601String(),
       }).eq('id', id);
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _setFunding(String id, bool fromCapital) async {
+    try {
+      await supabase.from('expenses').update({'funded_from_capital': fromCapital}).eq('id', id);
       _loadData();
     } catch (e) {
       if (mounted) {
@@ -177,6 +200,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             if (e['voucher_reference'] != null && e['voucher_reference'] != '')
                               Text('Voucher: ${e['voucher_reference']}'),
                             if (e['note'] != null && e['note'] != '') Text('Note: ${e['note']}'),
+                            if (_myRole == 'admin')
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: e['funded_from_capital'] == true,
+                                    onChanged: status == 'rejected'
+                                        ? null
+                                        : (v) => _setFunding(e['id'], v ?? false),
+                                  ),
+                                  const Text('Funded from capital (otherwise from profit)'),
+                                ],
+                              ),
                             if (canApprove && status == 'pending' && e['staff_id'] != supabase.auth.currentUser!.id)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
