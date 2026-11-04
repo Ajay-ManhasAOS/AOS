@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 enum ReportPeriod { today, thisWeek, thisMonth, thisYear, custom }
 
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
+  /// When true (operator use) the report is limited to the signed-in staff member's own branch.
+  final bool ownBranchOnly;
+  const ReportsScreen({super.key, this.ownBranchOnly = false});
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -22,6 +24,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   double _totalExpenses = 0;
   double _totalGovt = 0;
   double _totalIncentive = 0;
+  String? _branchId;
+  Map<String, List<Map<String, dynamic>>> _details = {};
 
   @override
   void initState() {
@@ -83,20 +87,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> _loadReport(DateTime start, DateTime end) async {
     setState(() => _loading = true);
     try {
+      if (widget.ownBranchOnly && _branchId == null) {
+        final b = await supabase.rpc('my_branch');
+        _branchId = b?.toString();
+        if (_branchId == null) throw Exception('No branch is assigned to your account');
+      }
       final startStr = start.toIso8601String();
       final endStr = end.toIso8601String();
 
       final requests = await supabase
           .from('service_requests')
-          .select('amount, quantity, branch_id, govt_fee_snapshot, incentive_snapshot, services(govt_fee, operator_incentive), branches!service_requests_branch_id_fkey(name)')
+          .select('id, amount, quantity, payment_method, payment_received_at, branch_id, govt_fee_snapshot, incentive_snapshot, customers(name), services(name, govt_fee, operator_incentive), branches!service_requests_branch_id_fkey(name)')
           .eq('payment_status', 'received')
+          .match(_branchFilter)
           .gte('payment_received_at', startStr)
           .lt('payment_received_at', endStr);
 
       final expenses = await supabase
           .from('expenses')
-          .select('amount, branch_id, branches(name)')
+          .select('id, amount, category, note, created_at, branch_id, branches(name)')
           .eq('approval_status', 'approved')
+          .match(_branchFilter)
           .gte('created_at', startStr)
           .lt('created_at', endStr);
 
@@ -106,12 +117,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       double govtTotal = 0;
       double incTotal = 0;
+      final details = <String, List<Map<String, dynamic>>>{};
       for (final r in requests) {
         final name = r['branches']?['name'] ?? 'Unknown';
         final qty = (r['quantity'] as num?)?.toInt() ?? 1;
         final amt = (r['amount'] as num?)?.toDouble() ?? 0;
         final govt = (((r['govt_fee_snapshot'] ?? r['services']?['govt_fee']) as num?)?.toDouble() ?? 0) * qty;
         final inc = (((r['incentive_snapshot'] ?? r['services']?['operator_incentive']) as num?)?.toDouble() ?? 0) * qty;
+        details.putIfAbsent(name, () => []).add({
+          'kind': 'payment',
+          'when': DateTime.tryParse('${r['payment_received_at']}')?.toLocal(),
+          'ref': r['id'].toString().substring(0, 8),
+          'who': r['customers']?['name'] ?? '',
+          'item': r['services']?['name'] ?? '',
+          'method': r['payment_method'] ?? '',
+          'amount': amt,
+          'govt': govt,
+          'counted': amt - govt,
+        });
         totals.putIfAbsent(name, () => {'revenue': 0, 'expenses': 0, 'govt': 0, 'incentive': 0});
         totals[name]!['revenue'] = totals[name]!['revenue']! + amt;
         totals[name]!['govt'] = totals[name]!['govt']! + govt;
@@ -123,6 +146,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
       for (final e in expenses) {
         final name = e['branches']?['name'] ?? 'Unknown';
         final amt = (e['amount'] as num?)?.toDouble() ?? 0;
+        final note = (e['note'] ?? '').toString();
+        details.putIfAbsent(name, () => []).add({
+          'kind': 'expense',
+          'when': DateTime.tryParse('${e['created_at']}')?.toLocal(),
+          'ref': e['id'].toString().substring(0, 8),
+          'who': '',
+          'item': note.isEmpty ? '${e['category'] ?? ''}' : '${e['category'] ?? ''} - $note',
+          'amount': amt,
+          'counted': -amt,
+        });
         totals.putIfAbsent(name, () => {'revenue': 0, 'expenses': 0});
         totals[name]!['expenses'] = totals[name]!['expenses']! + amt;
         expTotal += amt;
@@ -130,6 +163,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       setState(() {
         _branchTotals = totals;
+        _details = details;
         _totalRevenue = revTotal;
         _totalExpenses = expTotal;
         _totalGovt = govtTotal;
@@ -144,6 +178,55 @@ class _ReportsScreenState extends State<ReportsScreen> {
         );
       }
     }
+  }
+
+  Map<String, Object> get _branchFilter =>
+      (widget.ownBranchOnly && _branchId != null) ? {'branch_id': _branchId!} : <String, Object>{};
+
+  List<Widget> _detailRows(String branch) {
+    final list = _details[branch] ?? [];
+    if (list.isEmpty) return [const ListTile(dense: true, title: Text('No entries'))];
+    final df = DateFormat('dd MMM, hh:mm a');
+    final payments = list.where((d) => d['kind'] == 'payment').toList();
+    final exps = list.where((d) => d['kind'] == 'expense').toList();
+    int byWhen(Map<String, dynamic> a, Map<String, dynamic> b) {
+      final x = a['when'] as DateTime?;
+      final y = b['when'] as DateTime?;
+      if (x == null || y == null) return 0;
+      return x.compareTo(y);
+    }
+    payments.sort(byWhen);
+    exps.sort(byWhen);
+    Widget header(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
+        );
+    Widget row(Map<String, dynamic> d) {
+      final when = d['when'] as DateTime?;
+      final whenText = when == null ? '' : df.format(when);
+      final counted = (d['counted'] as num).toDouble();
+      final isPay = d['kind'] == 'payment';
+      final title = isPay ? '$whenText • ${d['ref']} • ${d['who']}' : '$whenText • ${d['ref']}';
+      final sub = isPay
+          ? '${d['item']}\nReceived ₹${(d['amount'] as num).toStringAsFixed(2)} • Govt fee ₹${(d['govt'] as num).toStringAsFixed(2)} • ${d['method']}'
+          : '${d['item']}';
+      return ListTile(
+        dense: true,
+        title: Text(title),
+        subtitle: Text(sub),
+        isThreeLine: isPay,
+        trailing: Text(
+          '${counted < 0 ? '−' : ''}₹${counted.abs().toStringAsFixed(2)}',
+          style: TextStyle(fontWeight: FontWeight.bold, color: counted < 0 ? Colors.red : Colors.green.shade700),
+        ),
+      );
+    }
+    return [
+      header('Payments received (${payments.length})'),
+      ...payments.map(row),
+      header('Expenses (${exps.length})'),
+      ...exps.map(row),
+    ];
   }
 
   String _periodLabel() {
@@ -165,7 +248,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reports')),
+      appBar: AppBar(title: Text(widget.ownBranchOnly ? 'Branch Report' : 'Reports')),
       body: Column(
         children: [
           Padding(
@@ -196,7 +279,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Company-wide', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(widget.ownBranchOnly ? 'Branch total' : 'Company-wide', style: const TextStyle(fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               Text('Amount collected: ₹${_totalRevenue.toStringAsFixed(2)}'),
                               Text('Govt fees (pass-through): - ₹${_totalGovt.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
@@ -224,10 +307,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         final inc = entry.value['incentive'] ?? 0;
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
+                          child: ExpansionTile(
+                            children: _detailRows(entry.key),
                             title: Text(entry.key),
                             subtitle: Text('Collected: ₹${rev.toStringAsFixed(2)} • Govt fee: ₹${govt.toStringAsFixed(2)} • Service revenue: ₹${(rev - govt).toStringAsFixed(2)}\nIncentive: ₹${inc.toStringAsFixed(2)} • Expenses: ₹${exp.toStringAsFixed(2)} • Net margin: ₹${(rev - govt - inc - exp).toStringAsFixed(2)}'),
-                            isThreeLine: true,
+                            
                           ),
                         );
                       }),

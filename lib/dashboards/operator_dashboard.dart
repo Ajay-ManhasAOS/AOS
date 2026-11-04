@@ -12,6 +12,9 @@ import 'sales_screen.dart';
 import 'my_applications_screen.dart';
 import 'services_screen.dart';
 import 'data_export_screen.dart';
+import 'reports_screen.dart';
+import 'reports_screen.dart';
+
 
 Widget _lead(IconData icon, Color color) => CircleAvatar(
       backgroundColor: color.withOpacity(0.12),
@@ -191,6 +194,9 @@ class OperatorDashboard extends StatelessWidget {
                 'Request leave and track approval status', () => const LeavesScreen()),
             _tile(context, Icons.table_view, Colors.indigo, 'My Reports',
                 'View and download your payments and expenses', () => const DataExportScreen()),
+            _tile(context, Icons.assessment, Colors.green.shade700, 'Branch Report',
+                'Sales and expenses of your branch, with details',
+                () => const ReportsScreen(ownBranchOnly: true)),
           ]),
         ],
       ),
