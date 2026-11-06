@@ -94,19 +94,52 @@ class _RoleRouterState extends State<RoleRouter> {
 
   Future<void> _markAttendance(String staffId, String branchId) async {
     String message;
+    bool isLate = false;
     try {
-      await supabase.from('attendance').insert({
-        'staff_id': staffId,
-        'branch_id': branchId,
-      });
+      final row = await supabase
+          .from('attendance')
+          .insert({
+            'staff_id': staffId,
+            'branch_id': branchId,
+          })
+          .select('is_late, minutes_late')
+          .single();
       message = 'Attendance marked for today';
+      if (row['is_late'] == true) {
+        isLate = true;
+        final now = DateTime.now();
+        final monthStart =
+            DateTime(now.year, now.month, 1).toIso8601String().substring(0, 10);
+        final lates = await supabase
+            .from('attendance')
+            .select('id')
+            .eq('staff_id', staffId)
+            .eq('is_late', true)
+            .gte('attendance_date', monthStart);
+        final cfg = await supabase
+            .from('attendance_settings')
+            .select('shift_start')
+            .eq('id', 1)
+            .maybeSingle();
+        final shift = (cfg?['shift_start'] ?? '09:50').toString().substring(0, 5);
+        message = 'You are ${row['minutes_late']} minutes late (shift starts at $shift). '
+            'Late marks this month: ${lates.length}';
+      }
+    } on PostgrestException catch (e) {
+      message = e.code == '23505'
+          ? 'Attendance already marked for today'
+          : 'Could not mark attendance: ${e.message}';
     } catch (e) {
-      message = 'Attendance already marked for today';
+      message = 'Could not mark attendance: $e';
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       scaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+        SnackBar(
+          content: Text(message),
+          duration: Duration(seconds: isLate ? 10 : 3),
+          backgroundColor: isLate ? Colors.orange.shade800 : null,
+        ),
       );
     });
   }

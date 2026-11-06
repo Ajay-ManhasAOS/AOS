@@ -21,6 +21,7 @@ import 'promo_codes_screen.dart';
 import 'data_export_screen.dart';
 import 'capital_screen.dart';
 import 'profit_sharing_screen.dart';
+import 'attendance_screen.dart';
 
 Widget _lead(IconData icon, Color color) => CircleAvatar(
       backgroundColor: color.withOpacity(0.12),
@@ -91,6 +92,8 @@ class AdminDashboard extends StatelessWidget {
                 'Unpaid salary from earlier months', () => const PendingPayrollScreen()),
             _tile(context, Icons.event_busy, Colors.pink, 'Leaves',
                 'Review and approve staff leave requests', () => const LeavesScreen()),
+            _tile(context, Icons.access_time, Colors.orange, 'Attendance',
+                'Login times and late marks by month', () => const AttendanceScreen()),
           ]),
           _group(Icons.account_balance, Colors.green.shade700, 'Finance', [
             _tile(context, Icons.bar_chart, Colors.teal, 'Reports',
